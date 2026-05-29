@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>Auth Security POC</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 720px; margin: 3em auto; line-height: 1.5; color: #222; }
+        h1 { margin-bottom: 0.2em; }
+        code, pre { background: #f4f4f4; padding: 0.15em 0.3em; border-radius: 3px; }
+        pre { padding: 0.8em; overflow-x: auto; }
+        .card { border: 1px solid #ddd; border-radius: 6px; padding: 1em 1.4em; margin: 1em 0; }
+        a.button { display: inline-block; background: #2b6cb0; color: white; padding: 0.4em 0.9em; border-radius: 4px; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <h1>Auth Security POC</h1>
+    <p>Two demos sharing one Spring Boot app: <strong>JWT refresh-token rotation</strong> and the <strong>OAuth 2.1 authorization-code flow with PKCE</strong>.</p>
+
+    <div class="card">
+        <h2>Demo 1 — JWT refresh token rotation</h2>
+        <p>REST-only. Try it with <code>curl</code>:</p>
+        <pre>curl -s localhost:8080/api/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"username":"alice","password":"wonderland"}'</pre>
+        <p>Then <code>POST /api/auth/refresh</code> with the refresh token. The old one is invalidated; reusing it revokes the whole token family.</p>
+    </div>
+
+    <div class="card">
+        <h2>Demo 2 — OAuth 2.1 PKCE flow</h2>
+        <p>Click below — the demo client generates a verifier+challenge, redirects to the authorization endpoint, completes the handshake, and shows the resulting access token.</p>
+        <p><a class="button" href="/client/login">Start PKCE flow</a></p>
+        <p>Demo users: <code>alice / wonderland</code> · <code>bob / builder</code></p>
+    </div>
+</body>
+</html>

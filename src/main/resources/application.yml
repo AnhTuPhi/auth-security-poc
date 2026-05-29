@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: auth-security-poc
+  thymeleaf:
+    cache: false
+
+app:
+  jwt:
+    issuer: auth-security-poc
+    # 256-bit HMAC secret for HS256. Rotate/inject via env in real deployments.
+    secret: "change-me-to-a-32-byte-or-longer-secret-please-rotate-in-prod"
+    access-token-ttl: PT5M           # 5 minutes
+    refresh-token-ttl: P7D            # 7 days
+  oauth:
+    authorization-code-ttl: PT60S     # 60 seconds
+    clients:
+      - clientId: demo-client
+        redirectUris:
+          - "http://localhost:8080/client/callback"
+        # Public client — no secret. PKCE is mandatory.
+        requirePkce: true
+
+logging:
+  level:
+    com.demo.authpoc: DEBUG
+    org.springframework.security: INFO

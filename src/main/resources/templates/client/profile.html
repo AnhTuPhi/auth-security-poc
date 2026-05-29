@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <title>PKCE result</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 760px; margin: 3em auto; line-height: 1.5; color: #222; }
+        .card { border: 1px solid #ddd; border-radius: 6px; padding: 1em 1.4em; margin: 1em 0; background: #fafafa; }
+        h2 { margin-top: 0; }
+        pre, code { background: #f4f4f4; padding: 0.15em 0.3em; border-radius: 3px; word-break: break-all; white-space: pre-wrap; }
+        pre { padding: 0.8em; }
+        .ok { color: #2f855a; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h1>PKCE handshake complete <span class="ok">&check;</span></h1>
+    <p>The client exchanged the authorization code plus its PKCE verifier for an access token, then used it to call <code>/api/me</code>.</p>
+
+    <div class="card">
+        <h2>1. Authorization code</h2>
+        <pre th:text="${code}"></pre>
+    </div>
+
+    <div class="card">
+        <h2>2. PKCE verifier (would have stayed client-side)</h2>
+        <pre th:text="${verifier}"></pre>
+    </div>
+
+    <div class="card">
+        <h2>3. Token response</h2>
+        <pre th:text="${token}"></pre>
+    </div>
+
+    <div class="card">
+        <h2>4. /api/me response (using access token)</h2>
+        <pre th:text="${me}"></pre>
+    </div>
+
+    <p><a href="/">&larr; Back to the index</a></p>
+</body>
+</html>

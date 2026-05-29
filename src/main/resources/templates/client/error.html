@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <title>Client error</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 540px; margin: 4em auto; line-height: 1.5; color: #222; }
+        .err { color: #c53030; }
+    </style>
+</head>
+<body>
+    <h1 class="err">PKCE flow aborted</h1>
+    <p th:text="${error}"></p>
+    <p><a href="/">&larr; Back to the index</a></p>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <title>Authorize</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 420px; margin: 4em auto; line-height: 1.5; color: #222; }
+        form { border: 1px solid #ddd; border-radius: 6px; padding: 1.4em; }
+        label { display: block; margin: 0.7em 0 0.2em; font-size: 0.9em; color: #555; }
+        input[type=text], input[type=password] {
+            width: 100%; padding: 0.5em; border: 1px solid #bbb; border-radius: 3px; box-sizing: border-box;
+        }
+        button { margin-top: 1.2em; background: #2b6cb0; color: white; border: 0; padding: 0.6em 1.2em; border-radius: 4px; cursor: pointer; }
+        .meta { font-size: 0.8em; color: #777; margin-top: 1em; }
+        code { background: #f4f4f4; padding: 0 0.2em; }
+    </style>
+</head>
+<body>
+    <h1>Sign in to authorize</h1>
+    <p>Application <code th:text="${clientId}">demo-client</code> is requesting access
+       with scope <code th:text="${scope}">USER</code>.</p>
+
+    <form method="post" action="/oauth/authorize">
+        <input type="hidden" name="client_id"             th:value="${clientId}"/>
+        <input type="hidden" name="redirect_uri"          th:value="${redirectUri}"/>
+        <input type="hidden" name="scope"                 th:value="${scope}"/>
+        <input type="hidden" name="state"                 th:value="${state}"/>
+        <input type="hidden" name="code_challenge"        th:value="${codeChallenge}"/>
+        <input type="hidden" name="code_challenge_method" th:value="${codeChallengeMethod}"/>
+
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" required/>
+
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required/>
+
+        <button type="submit">Authorize</button>
+    </form>
+
+    <p class="meta">
+        PKCE challenge: <code th:text="${codeChallenge}"></code><br/>
+        Method: <code th:text="${codeChallengeMethod}"></code>
+    </p>
+</body>
+</html>
