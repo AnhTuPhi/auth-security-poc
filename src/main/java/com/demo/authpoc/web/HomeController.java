@@ -10,4 +10,9 @@ public class HomeController {
     public String home() {
         return "index";
     }
+
+    @GetMapping("/jwt-demo")
+    public String jwtDemo() {
+        return "jwt-demo";
+    }
 }

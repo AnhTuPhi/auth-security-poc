@@ -27,6 +27,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/",
+                    "/jwt-demo",
                     "/api/auth/**",
                     "/oauth/**",
                     "/client/**",

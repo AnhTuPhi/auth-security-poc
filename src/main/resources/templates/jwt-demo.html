@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8"/>
+    <title>JWT Refresh Token Lifecycle Demo</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 2em auto; padding: 0 1em; line-height: 1.5; color: #222; }
+        h1 { margin-bottom: 0.1em; }
+        h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.2em; margin-top: 1.6em; }
+        .row { display: flex; gap: 1em; flex-wrap: wrap; }
+        .card { border: 1px solid #ddd; border-radius: 6px; padding: 1em 1.2em; margin: 0.8em 0; flex: 1 1 320px; background: #fafafa; }
+        .card h3 { margin-top: 0; font-size: 1em; color: #444; }
+        code, pre { background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.85em; }
+        pre { padding: 0.7em; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+        button { font: inherit; padding: 0.45em 0.9em; border-radius: 4px; border: 1px solid #2b6cb0; background: #2b6cb0; color: white; cursor: pointer; margin: 0.2em 0.3em 0.2em 0; }
+        button:hover { background: #1e4e7e; }
+        button.danger { background: #c53030; border-color: #c53030; }
+        button.danger:hover { background: #8b1f1f; }
+        button.warn { background: #d69e2e; border-color: #d69e2e; }
+        button:disabled { background: #999; border-color: #999; cursor: not-allowed; }
+        .status-pill { display: inline-block; padding: 0.15em 0.55em; border-radius: 12px; font-size: 0.8em; font-weight: 600; margin-left: 0.4em; }
+        .pill-ok { background: #c6f6d5; color: #1a4731; }
+        .pill-warn { background: #fef3c7; color: #78350f; }
+        .pill-bad { background: #fed7d7; color: #742a2a; }
+        #log { background: #1a1a1a; color: #d4d4d4; padding: 0.8em; border-radius: 6px; height: 380px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 0.78em; line-height: 1.4; }
+        #log .l-info { color: #79c0ff; }
+        #log .l-ok { color: #7ee787; }
+        #log .l-warn { color: #f0b429; }
+        #log .l-err { color: #ff7b72; }
+        #log .l-step { color: #d2a8ff; font-weight: bold; }
+        #log .l-time { color: #888; }
+        small { color: #666; }
+        kbd { background: #eee; border: 1px solid #ccc; border-bottom-width: 2px; border-radius: 3px; padding: 0.05em 0.3em; font-size: 0.85em; font-family: ui-monospace, monospace; }
+        @media (prefers-color-scheme: dark) {
+            body { color: #ddd; background: #1a1a1a; }
+            .card { background: #2a2a2a; border-color: #444; }
+            h2 { border-color: #444; }
+            code, pre { background: #333; color: #ddd; }
+            h3 { color: #bbb; }
+            small { color: #999; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>JWT Refresh Token Lifecycle Demo</h1>
+<p>Mô phỏng vòng đời thực tế của access + refresh token. Mỗi nút bấm = 1 bước, log chi tiết
+   vào <kbd>F12</kbd> Console <strong>và</strong> ô log bên dưới.</p>
+<p><small>Server config: access TTL = 5 phút, refresh TTL = 7 ngày. Demo user: <code>alice / wonderland</code></small></p>
+
+<h2>1. Trạng thái phiên</h2>
+<div class="row">
+    <div class="card">
+        <h3>Access token</h3>
+        <p>Status: <span id="accStatus" class="status-pill pill-bad">CHƯA CÓ</span></p>
+        <p>Hết hạn sau: <strong><span id="accCountdown">—</span></strong></p>
+        <pre id="accTokenView">(chưa login)</pre>
+        <small>Payload đã decode:</small>
+        <pre id="accPayloadView">—</pre>
+    </div>
+    <div class="card">
+        <h3>Refresh token</h3>
+        <p>Status: <span id="refStatus" class="status-pill pill-bad">CHƯA CÓ</span></p>
+        <p>Đếm số lần xoay vòng: <strong><span id="rotCount">0</span></strong></p>
+        <pre id="refTokenView">(chưa login)</pre>
+        <small>Token này lưu trong memory, F5 sẽ mất.</small>
+    </div>
+</div>
+
+<h2>2. Mô phỏng vòng đời (bấm theo thứ tự)</h2>
+<div class="card">
+    <p><strong>Bước A — T+0:00 Login</strong></p>
+    <button onclick="step_login()">A. POST /api/auth/login</button>
+
+    <p style="margin-top:1em"><strong>Bước B — T+0:15 Gọi API protected (token còn hạn)</strong></p>
+    <button onclick="step_callMe(false)">B. GET /api/me</button>
+
+    <p style="margin-top:1em"><strong>Bước C — T+5:30 Access token hết hạn → gọi API → 401</strong></p>
+    <button class="warn" onclick="step_simulateExpiry()">C1. "Hết hạn" access token (sửa local cho nhanh)</button>
+    <button onclick="step_callMe(false)">C2. GET /api/me (sẽ fail 401)</button>
+
+    <p style="margin-top:1em"><strong>Bước D — T+5:31 Auto-refresh</strong></p>
+    <button onclick="step_refresh()">D. POST /api/auth/refresh</button>
+
+    <p style="margin-top:1em"><strong>Bước E — Gọi lại API với token mới</strong></p>
+    <button onclick="step_callMe(false)">E. GET /api/me (lần này OK)</button>
+
+    <p style="margin-top:1em"><strong>Bước F — Auto-mode: bật vòng lặp tự gọi /api/me mỗi 8s</strong> (sẽ proactive-refresh khi sắp hết hạn, hoặc reactive-refresh khi nhận 401)</p>
+    <button id="autoBtn" onclick="step_toggleAuto()">F. Bật auto-poll</button>
+    <small>Để bật/tắt vòng lặp gọi tự động — minh hoạ refresh "vô hình" cho user.</small>
+</div>
+
+<h2>3. Mô phỏng tấn công — Refresh Token Reuse</h2>
+<div class="card">
+    <p>Giả sử attacker đánh cắp refresh token CŨ (đã bị rotate). Khi attacker dùng → server phát hiện reuse → revoke cả family.</p>
+    <button class="danger" onclick="step_reuseAttack()">G. Gửi refresh token CŨ → REUSE DETECTION</button>
+    <button class="danger" onclick="step_refresh()">H. Thử refresh bằng token MỚI (giờ cũng dead)</button>
+    <small>Sau H, cả family bị revoke. User thật cũng bị đá ra — phải login lại.</small>
+</div>
+
+<h2>4. Logout</h2>
+<div class="card">
+    <button onclick="step_logout()">I. POST /api/auth/logout</button>
+    <button onclick="step_reset()">Reset state phía client</button>
+</div>
+
+<h2>5. Console log (mirror)</h2>
+<div id="log"></div>
+
+<script>
+(() => {
+    // ============================================================
+    //  State
+    // ============================================================
+    const state = {
+        accessToken: null,
+        refreshToken: null,
+        previousRefreshToken: null,    // giữ token CŨ để mô phỏng reuse
+        accessExpiresAt: null,         // epoch ms
+        rotationCount: 0,
+        autoPolling: false,
+        autoTimer: null,
+        sessionStart: null,            // dùng để hiển thị T+mm:ss
+    };
+
+    // ============================================================
+    //  Logging — vừa console, vừa mirror lên page
+    // ============================================================
+    const logEl = document.getElementById('log');
+    const tNow = () => {
+        if (!state.sessionStart) return '00:00';
+        const diff = Math.floor((Date.now() - state.sessionStart) / 1000);
+        return `${String(Math.floor(diff / 60)).padStart(2, '0')}:${String(diff % 60).padStart(2, '0')}`;
+    };
+    const append = (cls, text) => {
+        const line = document.createElement('div');
+        line.innerHTML = `<span class="l-time">[T+${tNow()}]</span> <span class="${cls}">${escapeHtml(text)}</span>`;
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+    };
+    const log = {
+        step: (msg) => { console.log(`%c[STEP] ${msg}`, 'color:#a371f7;font-weight:bold'); append('l-step', `[STEP] ${msg}`); },
+        info: (msg, obj) => {
+            if (obj !== undefined) { console.log(`[INFO] ${msg}`, obj); append('l-info', `[INFO] ${msg} ${oneLineJson(obj)}`); }
+            else { console.log(`[INFO] ${msg}`); append('l-info', `[INFO] ${msg}`); }
+        },
+        ok: (msg, obj) => {
+            if (obj !== undefined) { console.log(`%c[OK] ${msg}`, 'color:green', obj); append('l-ok', `[OK] ${msg} ${oneLineJson(obj)}`); }
+            else { console.log(`%c[OK] ${msg}`, 'color:green'); append('l-ok', `[OK] ${msg}`); }
+        },
+        warn: (msg, obj) => {
+            if (obj !== undefined) { console.warn(`[WARN] ${msg}`, obj); append('l-warn', `[WARN] ${msg} ${oneLineJson(obj)}`); }
+            else { console.warn(`[WARN] ${msg}`); append('l-warn', `[WARN] ${msg}`); }
+        },
+        err: (msg, obj) => {
+            if (obj !== undefined) { console.error(`[ERR] ${msg}`, obj); append('l-err', `[ERR] ${msg} ${oneLineJson(obj)}`); }
+            else { console.error(`[ERR] ${msg}`); append('l-err', `[ERR] ${msg}`); }
+        },
+    };
+    const oneLineJson = (o) => {
+        try { return JSON.stringify(o); } catch { return String(o); }
+    };
+    const escapeHtml = (s) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    // ============================================================
+    //  UI updates
+    // ============================================================
+    const $ = (id) => document.getElementById(id);
+    const truncate = (s, n = 60) => !s ? '(empty)' : (s.length > n ? s.slice(0, n) + '…' : s);
+
+    const decodeJwt = (token) => {
+        try {
+            const [, payload] = token.split('.');
+            return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+        } catch { return null; }
+    };
+
+    const renderState = () => {
+        // Access token
+        if (state.accessToken) {
+            $('accTokenView').textContent = truncate(state.accessToken, 140);
+            const payload = decodeJwt(state.accessToken);
+            $('accPayloadView').textContent = payload ? JSON.stringify(payload, null, 2) : '(không decode được)';
+        } else {
+            $('accTokenView').textContent = '(chưa có)';
+            $('accPayloadView').textContent = '—';
+        }
+
+        // Refresh token
+        $('refTokenView').textContent = state.refreshToken ? truncate(state.refreshToken, 100) : '(chưa có)';
+        $('rotCount').textContent = state.rotationCount;
+
+        renderStatus();
+    };
+
+    const renderStatus = () => {
+        const now = Date.now();
+
+        // Access
+        if (!state.accessToken) {
+            $('accStatus').textContent = 'CHƯA CÓ'; $('accStatus').className = 'status-pill pill-bad';
+            $('accCountdown').textContent = '—';
+        } else if (state.accessExpiresAt && now > state.accessExpiresAt) {
+            $('accStatus').textContent = 'HẾT HẠN'; $('accStatus').className = 'status-pill pill-bad';
+            $('accCountdown').textContent = 'đã hết hạn';
+        } else if (state.accessExpiresAt) {
+            const secs = Math.max(0, Math.floor((state.accessExpiresAt - now) / 1000));
+            const m = Math.floor(secs / 60), s = secs % 60;
+            $('accCountdown').textContent = `${m}m ${String(s).padStart(2, '0')}s`;
+            if (secs < 30) { $('accStatus').textContent = 'SẮP HẾT HẠN'; $('accStatus').className = 'status-pill pill-warn'; }
+            else { $('accStatus').textContent = 'HỢP LỆ'; $('accStatus').className = 'status-pill pill-ok'; }
+        }
+
+        // Refresh
+        if (!state.refreshToken) { $('refStatus').textContent = 'CHƯA CÓ'; $('refStatus').className = 'status-pill pill-bad'; }
+        else { $('refStatus').textContent = 'CÓ'; $('refStatus').className = 'status-pill pill-ok'; }
+    };
+    setInterval(renderStatus, 500);
+
+    // ============================================================
+    //  Helpers
+    // ============================================================
+    const storeTokens = (resp) => {
+        state.previousRefreshToken = state.refreshToken; // giữ token cũ để demo reuse
+        state.accessToken = resp.accessToken;
+        state.refreshToken = resp.refreshToken;
+        state.accessExpiresAt = Date.now() + resp.expiresIn * 1000;
+        log.info(`Đã lưu tokens. Access TTL = ${resp.expiresIn}s. Previous refresh giữ lại để demo reuse.`);
+        renderState();
+    };
+
+    const callApi = async (path, opts = {}, withAuth = false) => {
+        const headers = Object.assign({}, opts.headers || {});
+        if (withAuth && state.accessToken) headers['Authorization'] = `Bearer ${state.accessToken}`;
+        if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+        const url = path;
+        log.info(`→ ${opts.method || 'GET'} ${url}`, withAuth ? { auth: `Bearer ${truncate(state.accessToken, 25)}` } : {});
+        const res = await fetch(url, { ...opts, headers });
+        const text = await res.text();
+        let body; try { body = JSON.parse(text); } catch { body = text; }
+        log.info(`← ${res.status} ${res.statusText}`, body);
+        return { ok: res.ok, status: res.status, body };
+    };
+
+    // ============================================================
+    //  Steps
+    // ============================================================
+    window.step_login = async () => {
+        log.step('A. LOGIN (alice / wonderland)');
+        state.sessionStart = Date.now();
+        const r = await callApi('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username: 'alice', password: 'wonderland' })
+        });
+        if (r.ok) {
+            log.ok('Login thành công — nhận access + refresh token');
+            state.rotationCount = 0;
+            state.previousRefreshToken = null;
+            storeTokens(r.body);
+        } else {
+            log.err('Login thất bại', r.body);
+        }
+    };
+
+    window.step_callMe = async (silentRefresh = false) => {
+        if (!state.accessToken && !state.refreshToken) {
+            log.warn('Chưa login. Bấm bước A trước.');
+            return;
+        }
+        if (!silentRefresh) log.step('Gọi GET /api/me');
+
+        // PROACTIVE refresh: nếu access còn < 30s thì refresh trước.
+        if (state.accessExpiresAt && state.accessExpiresAt - Date.now() < 30_000 && state.refreshToken) {
+            log.warn('Access token sắp hết hạn (<30s) → proactive refresh trước khi gọi');
+            await window.step_refresh();
+        }
+
+        const r = await callApi('/api/me', { method: 'GET' }, true);
+
+        if (r.status === 401 || r.status === 403) {
+            log.warn('Server trả 401/403 — access token có thể đã hết hạn/sai. Thử AUTO-REFRESH.');
+            if (state.refreshToken) {
+                const refreshed = await window.step_refresh();
+                if (refreshed) {
+                    log.step('Retry GET /api/me với access token mới');
+                    const r2 = await callApi('/api/me', { method: 'GET' }, true);
+                    if (r2.ok) log.ok('Retry thành công sau khi refresh', r2.body);
+                    else log.err('Retry vẫn fail', r2.body);
+                }
+            } else {
+                log.err('Không còn refresh token — bắt buộc user login lại');
+            }
+        } else if (r.ok) {
+            log.ok('/api/me trả về thành công', r.body);
+        }
+    };
+
+    window.step_simulateExpiry = () => {
+        log.step('C1. MÔ PHỎNG access token hết hạn (làm hỏng token phía client cho nhanh)');
+        if (!state.accessToken) { log.warn('Chưa có access token'); return; }
+        // Sửa chữ cuối → chữ ký sai → server reject như expired
+        state.accessToken = state.accessToken.slice(0, -3) + 'XXX';
+        state.accessExpiresAt = Date.now() - 1000;
+        log.warn('Access token đã bị "phá" — server sẽ reject lần gọi tiếp theo');
+        renderState();
+    };
+
+    window.step_refresh = async () => {
+        log.step('Refresh token: POST /api/auth/refresh');
+        if (!state.refreshToken) { log.err('Không có refresh token'); return false; }
+        const r = await callApi('/api/auth/refresh', {
+            method: 'POST',
+            body: JSON.stringify({ refreshToken: state.refreshToken })
+        });
+        if (r.ok) {
+            state.rotationCount++;
+            log.ok(`Rotation thành công (lần thứ ${state.rotationCount}). Token cũ đã bị mark "used".`);
+            storeTokens(r.body);
+            return true;
+        } else {
+            log.err('Refresh thất bại — có thể bị revoke do reuse detection', r.body);
+            return false;
+        }
+    };
+
+    window.step_reuseAttack = async () => {
+        log.step('G. MÔ PHỎNG REUSE — gửi refresh token CŨ');
+        if (!state.previousRefreshToken) {
+            log.warn('Chưa có previous refresh token — hãy refresh ít nhất 1 lần trước (bước D).');
+            return;
+        }
+        log.warn(`Attacker dùng token CŨ: ${truncate(state.previousRefreshToken, 30)}`);
+        const r = await callApi('/api/auth/refresh', {
+            method: 'POST',
+            body: JSON.stringify({ refreshToken: state.previousRefreshToken })
+        });
+        if (r.status === 401) {
+            log.err('SERVER PHÁT HIỆN REUSE — revoke toàn bộ family!', r.body);
+            log.warn('Token MỚI mà client đang giữ giờ cũng bị revoke. Lần refresh tiếp theo sẽ fail.');
+        } else {
+            log.warn('Server không phản ứng như mong đợi', r.body);
+        }
+    };
+
+    window.step_logout = async () => {
+        log.step('I. LOGOUT');
+        if (!state.refreshToken) { log.warn('Không có refresh token để logout'); return; }
+        const r = await callApi('/api/auth/logout', {
+            method: 'POST',
+            body: JSON.stringify({ refreshToken: state.refreshToken })
+        });
+        if (r.status === 204 || r.ok) log.ok('Logout OK — server đã revoke refresh token này');
+        else log.warn('Logout response bất thường', r.body);
+        step_reset(true);
+    };
+
+    window.step_reset = (silent = false) => {
+        if (!silent) log.step('Reset state phía client');
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.previousRefreshToken = null;
+        state.accessExpiresAt = null;
+        state.rotationCount = 0;
+        if (state.autoTimer) { clearInterval(state.autoTimer); state.autoTimer = null; state.autoPolling = false; $('autoBtn').textContent = 'F. Bật auto-poll'; }
+        renderState();
+    };
+
+    window.step_toggleAuto = () => {
+        if (state.autoPolling) {
+            clearInterval(state.autoTimer); state.autoTimer = null; state.autoPolling = false;
+            $('autoBtn').textContent = 'F. Bật auto-poll';
+            log.step('F. TẮT auto-poll');
+        } else {
+            state.autoPolling = true;
+            $('autoBtn').textContent = 'F. Tắt auto-poll';
+            log.step('F. BẬT auto-poll (mỗi 8s gọi /api/me, proactive refresh khi <30s)');
+            state.autoTimer = setInterval(() => {
+                if (!state.accessToken && !state.refreshToken) { log.warn('Auto-poll: chưa login → skip'); return; }
+                log.info('--- auto tick ---');
+                window.step_callMe(true);
+            }, 8000);
+        }
+    };
+
+    // ============================================================
+    //  Init
+    // ============================================================
+    log.info('Trang sẵn sàng. Mở DevTools (F12) → Console để xem chi tiết hơn.');
+    log.info('Server: /api/auth/{login,refresh,logout} + /api/me. Access TTL = 5 phút.');
+    renderState();
+})();
+</script>
+
+<p style="margin-top:2em"><a href="/">← Về trang chủ</a></p>
+</body>
+</html>

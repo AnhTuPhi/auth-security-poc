@@ -81,7 +81,7 @@ public class AuthController {
         ));
     }
 
-    static class BadCredentialsException extends RuntimeException {
+    public static class BadCredentialsException extends RuntimeException {
         BadCredentialsException(String m) { super(m); }
     }
 }

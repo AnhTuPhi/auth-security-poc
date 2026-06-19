@@ -162,3 +162,55 @@ Try with the wrong `code_verifier` → `400 invalid_grant: PKCE verification fai
 - The demo client and the AS share the same Spring session for convenience. Real public
   clients (SPA / mobile) keep `verifier` and `state` in their own storage.
 - We deliberately reject `code_challenge_method=plain` — only `S256` is acceptable.
+
+---
+
+## Notable security techniques
+
+A condensed list of the techniques worth borrowing — the ones that are easy to miss but
+guard against real vulnerabilities.
+
+### Feature 1 — JWT + refresh rotation
+
+| Technique | Why it matters | Where |
+|-----------|---------------|-------|
+| **Opaque refresh tokens** (not JWT) | Server keeps full control of state — can revoke instantly. JWT refresh can't be revoked before expiry. | [RefreshToken.java](src/main/java/com/demo/authpoc/jwt/RefreshToken.java) |
+| **Token family + reuse detection** | One stolen rotated token → whole family revoked → both attacker and user kicked out → forced re-login limits blast radius. | [RefreshTokenService.java:72-78](src/main/java/com/demo/authpoc/jwt/RefreshTokenService.java) |
+| **`requireIssuer` on JWT verify** | Rejects tokens minted by a different authority sharing the same secret (cross-tenant defence). | [JwtService.java:49](src/main/java/com/demo/authpoc/jwt/JwtService.java) |
+| **`jti` claim** | Unique token ID — future-proofs revocation lists / token introspection. | [JwtService.java:35](src/main/java/com/demo/authpoc/jwt/JwtService.java) |
+| **Permissive auth filter** | Filter sets context if token is valid, *does not reject* if invalid — `authorizeHttpRequests` decides. Cleaner separation of concerns. | [JwtAuthenticationFilter.java:53-55](src/main/java/com/demo/authpoc/jwt/JwtAuthenticationFilter.java) |
+| **`SecureRandom` + 256-bit + URL-safe base64** | CSPRNG + enough entropy + safe to put in URLs/cookies/headers. | [RefreshTokenService.java:108-112](src/main/java/com/demo/authpoc/jwt/RefreshTokenService.java) |
+| **BCrypt for passwords** | Adaptive hash + auto-salt; slow on purpose. | [SecurityConfig.java:17-19](src/main/java/com/demo/authpoc/config/SecurityConfig.java) |
+| **`volatile` flags + `ConcurrentHashMap`** | Cross-thread visibility for the in-memory store. *Note:* not atomic check-then-act — production needs DB transactions or `compareAndSet`. | [RefreshToken.java:19-20](src/main/java/com/demo/authpoc/jwt/RefreshToken.java) |
+
+### Feature 2 — OAuth 2.1 + PKCE
+
+| Technique | Why it matters | Where |
+|-----------|---------------|-------|
+| **Constant-time PKCE compare** (`MessageDigest.isEqual`) | `String.equals()` short-circuits on first byte mismatch → timing side-channel. Constant-time prevents brute-forcing the challenge byte-by-byte. | [PkceUtils.java:50-53](src/main/java/com/demo/authpoc/oauth/PkceUtils.java) |
+| **Atomic single-use authorization code** | Each code can be exchanged exactly once — second attempt → `invalid_grant: code already used`. Classic replay defence. | [AuthorizationCodeStore.java:41-52](src/main/java/com/demo/authpoc/oauth/AuthorizationCodeStore.java) |
+| **Reject `code_challenge_method=plain`** | `plain` leaks the verifier if the authorize request is intercepted — defeats PKCE's purpose. OAuth 2.1 mandates S256. | [AuthorizationServerController.java:63-65](src/main/java/com/demo/authpoc/oauth/AuthorizationServerController.java) |
+| **`state` parameter (CSRF defence)** | Client stores random state in its session and checks it matches in callback. Stops attacker from injecting their own auth code into the victim's session. | [ClientDemoController.java:53,74-82](src/main/java/com/demo/authpoc/oauth/ClientDemoController.java) |
+| **`redirect_uri` exact-match whitelist** | Exact match against the registered list (not prefix). Stops open-redirect → code leakage to attacker domains. Checked at *both* `/authorize` and `/token`. | [AuthorizationServerController.java:57-59,126-128](src/main/java/com/demo/authpoc/oauth/AuthorizationServerController.java) |
+| **`client_id` bound to the code at consume** | The code can only be exchanged by the client that requested it — prevents cross-client code injection. | [AuthorizationServerController.java:123-125](src/main/java/com/demo/authpoc/oauth/AuthorizationServerController.java) |
+| **Short auth-code TTL (60s)** | The window for an intercepted code to be useful is tiny. | [application.yml:18](src/main/resources/application.yml) |
+| **Server stores the challenge** | Server saves `code_challenge` when issuing the code and verifies `verifier` against it at `/token` — client can't game both ends. | [AuthorizationCode.java](src/main/java/com/demo/authpoc/oauth/AuthorizationCode.java) |
+
+### Cross-cutting
+
+| Technique | Why it matters | Where |
+|-----------|---------------|-------|
+| **Validation at the boundary** (`@Valid` + `@NotBlank`) | Spring rejects malformed requests with 400 before any business logic runs. | [LoginRequest.java](src/main/java/com/demo/authpoc/jwt/dto/LoginRequest.java) |
+| **Centralised exception mapping** | Custom exceptions → OAuth-standard error codes. No stack traces leaked to clients. | [ApiExceptionHandler.java](src/main/java/com/demo/authpoc/web/ApiExceptionHandler.java) |
+| **Java records for DTOs / value objects** | Immutable by construction — safe to pass across threads. | [`User`](src/main/java/com/demo/authpoc/user/User.java), [`AuthorizationCode`](src/main/java/com/demo/authpoc/oauth/AuthorizationCode.java), etc. |
+| **CSRF disabled — deliberately** | Stateless Bearer-token APIs don't carry session cookies, so CSRF doesn't apply. The OAuth flow uses its own `state` parameter instead. | [SecurityConfig.java:25](src/main/java/com/demo/authpoc/config/SecurityConfig.java) |
+
+### Top 5 "silent" techniques worth memorising
+
+1. **`MessageDigest.isEqual`** — constant-time comparison defeats timing attacks (PKCE verify).
+2. **Atomic single-use code + reuse detection** — replay defence baked into the protocol.
+3. **`requireIssuer` on JWT verify** — cross-tenant guard often forgotten.
+4. **`redirect_uri` exact-match (both endpoints)** — kills the open-redirect → code-leak chain.
+5. **OAuth `state` parameter** — CSRF defence specific to the OAuth flow.
+
+These are the ones the spec hints at but doesn't loudly demand — easy to skip, painful to miss.
