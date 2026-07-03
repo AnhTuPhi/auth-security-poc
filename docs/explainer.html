@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>auth-security-poc — Visual Explainer</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1c2740; --ink:#e7ecf5; --mut:#9fb0cc;
+    --line:#2b3550; --accent:#5b9dff; --accent2:#7c5cff;
+    --ok:#37d29a; --warn:#ffb454; --bad:#ff6b6b; --code:#0b1020;
+    --chip:#223154;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       background:linear-gradient(180deg,#0d1220,#0f1420 40%);color:var(--ink);line-height:1.55}
+  header{padding:2.4em 1.2em 1.6em;text-align:center;border-bottom:1px solid var(--line);
+         background:radial-gradient(1200px 300px at 50% -60px,rgba(91,157,255,.18),transparent)}
+  header h1{margin:.1em 0;font-size:2em;letter-spacing:.3px}
+  header p{margin:.3em auto;max-width:720px;color:var(--mut)}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 1.1em 4em}
+  nav.tabs{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:.4em;
+           padding:.7em 0;background:rgba(15,20,32,.85);backdrop-filter:blur(8px);
+           border-bottom:1px solid var(--line);justify-content:center}
+  nav.tabs button{background:var(--panel);color:var(--mut);border:1px solid var(--line);
+           padding:.5em .95em;border-radius:999px;cursor:pointer;font-size:.9em;transition:.15s}
+  nav.tabs button:hover{color:var(--ink);border-color:var(--accent)}
+  nav.tabs button.active{background:linear-gradient(90deg,var(--accent),var(--accent2));
+           color:#fff;border-color:transparent}
+  section.tab{display:none;animation:fade .25s ease}
+  section.tab.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  h2{font-size:1.45em;margin:1.4em 0 .3em}
+  h3{font-size:1.1em;margin:1.3em 0 .2em;color:#cddcff}
+  p{color:#d4ddec}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+        padding:1.1em 1.3em;margin:1em 0;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+  .grid{display:grid;gap:1em}
+  @media(min-width:720px){.grid.two{grid-template-columns:1fr 1fr}}
+  code{background:var(--code);padding:.12em .4em;border-radius:5px;font-size:.9em;color:#a9d5ff}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:1em;
+      overflow-x:auto;font-size:.85em}
+  pre code{background:none;padding:0;color:#cfe3ff}
+  .pill{display:inline-block;font-size:.72em;padding:.15em .6em;border-radius:999px;
+        background:var(--chip);color:#bcd2ff;margin-right:.3em;border:1px solid var(--line)}
+  .pill.ok{background:rgba(55,210,154,.15);color:var(--ok);border-color:rgba(55,210,154,.35)}
+  .pill.bad{background:rgba(255,107,107,.15);color:var(--bad);border-color:rgba(255,107,107,.35)}
+  .pill.warn{background:rgba(255,180,84,.15);color:var(--warn);border-color:rgba(255,180,84,.35)}
+  table{width:100%;border-collapse:collapse;margin:.6em 0;font-size:.9em}
+  th,td{text-align:left;padding:.55em .6em;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:#a9c0e6;font-weight:600}
+  .muted{color:var(--mut)}
+  .lead{font-size:1.05em;color:#cfdbef}
+  svg{width:100%;height:auto;display:block}
+  .stepbar{display:flex;flex-wrap:wrap;gap:.5em;margin:1em 0}
+  .stepbar button{flex:1;min-width:120px;background:var(--panel2);border:1px solid var(--line);
+        color:var(--mut);padding:.5em;border-radius:9px;cursor:pointer;font-size:.82em}
+  .stepbar button.on{border-color:var(--accent);color:#fff;background:#22304e}
+  .stagebox{background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+        padding:1em 1.2em;min-height:96px}
+  .stagebox h4{margin:.1em 0 .4em;color:#dfe9ff}
+  .kbd{font-family:ui-monospace,Menlo,monospace;font-size:.85em}
+  .flowrow{display:flex;align-items:center;gap:.5em;flex-wrap:wrap;margin:.4em 0}
+  .node{background:var(--chip);border:1px solid var(--line);border-radius:9px;padding:.4em .7em;font-size:.85em}
+  .arrow{color:var(--accent);font-weight:700}
+  .foot{margin-top:2.5em;padding-top:1.2em;border-top:1px solid var(--line);color:var(--mut);font-size:.85em;text-align:center}
+  .toggle-legit{color:var(--ok)} .toggle-attack{color:var(--bad)}
+  .switch{display:inline-flex;gap:.4em;background:var(--panel2);border:1px solid var(--line);
+          border-radius:999px;padding:.25em;margin:.5em 0}
+  .switch button{border:0;background:none;color:var(--mut);padding:.35em .9em;border-radius:999px;cursor:pointer}
+  .switch button.sel{background:#22304e;color:#fff}
+  ul.tight{margin:.3em 0 .3em 1.1em;padding:0} ul.tight li{margin:.25em 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔐 auth-security-poc</h1>
+  <p>A visual walk-through of the two authentication patterns in this repo — <strong>JWT
+  refresh-token rotation with reuse detection</strong> and the <strong>OAuth 2.1 Authorization
+  Code flow with PKCE</strong> — plus the scaling story when you run more than one replica.</p>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="overview" class="active">Overview</button>
+  <button data-tab="jwt">POC 1 · JWT Rotation</button>
+  <button data-tab="pkce">POC 2 · OAuth + PKCE</button>
+  <button data-tab="defences">Silent defences</button>
+  <button data-tab="scale">Scaling</button>
+</nav>
+
+<div class="wrap">
+
+<!-- ============================ OVERVIEW ============================ -->
+<section class="tab active" id="overview">
+  <h2>One app, several hats</h2>
+  <p class="lead">A single Spring Boot 3 / Java 21 process acts as authorization server,
+  resource server, and a demo public client — so you can see every side of the handshake in
+  one place. Everything is in-memory, so it boots clean every run.</p>
+
+  <div class="card">
+  <svg viewBox="0 0 900 360" role="img" aria-label="System overview">
+    <defs>
+      <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#5b9dff"/><stop offset="1" stop-color="#7c5cff"/>
+      </linearGradient>
+      <marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#5b9dff"/>
+      </marker>
+    </defs>
+    <rect x="20" y="20" width="860" height="320" rx="16" fill="#131a2b" stroke="#2b3550"/>
+    <text x="40" y="48" fill="#9fb0cc" font-size="14">auth-security-poc · single JVM</text>
+
+    <rect x="40" y="140" width="150" height="70" rx="10" fill="#1c2740" stroke="#2b3550"/>
+    <text x="115" y="172" fill="#e7ecf5" font-size="14" text-anchor="middle">Browser</text>
+    <text x="115" y="192" fill="#9fb0cc" font-size="12" text-anchor="middle">/ curl</text>
+
+    <rect x="250" y="70" width="200" height="90" rx="10" fill="#20305a" stroke="#3a5da8"/>
+    <text x="350" y="100" fill="#cfe0ff" font-size="14" text-anchor="middle" font-weight="700">Authorization Server</text>
+    <text x="350" y="122" fill="#9fb0cc" font-size="11.5" text-anchor="middle">/oauth/authorize · /oauth/token</text>
+    <text x="350" y="140" fill="#9fb0cc" font-size="11.5" text-anchor="middle">AuthorizationCodeStore</text>
+
+    <rect x="250" y="200" width="200" height="90" rx="10" fill="#203a2f" stroke="#2f7d5e"/>
+    <text x="350" y="230" fill="#c9f5e0" font-size="14" text-anchor="middle" font-weight="700">Resource Server</text>
+    <text x="350" y="252" fill="#9fb0cc" font-size="11.5" text-anchor="middle">/api/me · /api/auth/*</text>
+    <text x="350" y="270" fill="#9fb0cc" font-size="11.5" text-anchor="middle">JwtAuthenticationFilter</text>
+
+    <rect x="510" y="135" width="200" height="90" rx="10" fill="#33264d" stroke="#6d54b0"/>
+    <text x="610" y="165" fill="#e2d6ff" font-size="14" text-anchor="middle" font-weight="700">Demo Public Client</text>
+    <text x="610" y="187" fill="#9fb0cc" font-size="11.5" text-anchor="middle">/client/login</text>
+    <text x="610" y="205" fill="#9fb0cc" font-size="11.5" text-anchor="middle">/client/callback</text>
+
+    <rect x="750" y="135" width="110" height="90" rx="10" fill="#1c2740" stroke="#2b3550"/>
+    <text x="805" y="170" fill="#e7ecf5" font-size="13" text-anchor="middle">In-memory</text>
+    <text x="805" y="190" fill="#9fb0cc" font-size="11.5" text-anchor="middle">stores</text>
+    <text x="805" y="208" fill="#ffb454" font-size="11" text-anchor="middle">⚠ per-JVM</text>
+
+    <line x1="190" y1="175" x2="248" y2="120" stroke="#5b9dff" stroke-width="2" marker-end="url(#ah)"/>
+    <line x1="190" y1="180" x2="248" y2="240" stroke="#5b9dff" stroke-width="2" marker-end="url(#ah)"/>
+    <line x1="450" y1="115" x2="508" y2="165" stroke="#5b9dff" stroke-width="2" marker-end="url(#ah)"/>
+    <line x1="610" y1="135" x2="450" y2="245" stroke="#5b9dff" stroke-width="2" marker-end="url(#ah)"/>
+    <line x1="450" y1="130" x2="748" y2="175" stroke="#7c5cff" stroke-width="2" marker-end="url(#ah)"/>
+  </svg>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <span class="pill">POC 1</span><h3 style="margin-top:.4em">JWT refresh rotation</h3>
+      <p class="muted">Short-lived stateless access tokens (5&nbsp;min) + long-lived opaque
+      refresh tokens (7&nbsp;days) that <strong>rotate</strong> on every use. Replaying an old
+      refresh token trips <strong>reuse detection</strong> and revokes the whole token family.</p>
+    </div>
+    <div class="card">
+      <span class="pill">POC 2</span><h3 style="margin-top:.4em">OAuth 2.1 + PKCE</h3>
+      <p class="muted">Authorization Code flow for a public client, where a
+      <strong>PKCE S256</strong> challenge binds the party that starts the flow to the party
+      that redeems the code — no client secret needed.</p>
+    </div>
+  </div>
+
+  <h3>Demo users</h3>
+  <table>
+    <tr><th>Username</th><th>Password</th><th>Roles</th></tr>
+    <tr><td class="kbd">alice</td><td class="kbd">wonderland</td><td>USER</td></tr>
+    <tr><td class="kbd">bob</td><td class="kbd">builder</td><td>USER, ADMIN</td></tr>
+  </table>
+  <p class="muted">Run <code>mvn spring-boot:run</code>, then open
+  <code>http://localhost:8080</code>. See <code>WALKTHROUGH.md</code> for runnable curl scripts.</p>
+</section>
+
+<!-- ============================ JWT ============================ -->
+<section class="tab" id="jwt">
+  <h2>POC 1 — JWT access tokens + refresh-token rotation</h2>
+  <p class="lead">The hard problem: a JWT is <em>stateless</em>, so you can verify it anywhere —
+  but you <strong>can't take it back</strong>. Keep access tokens short; make the long-lived
+  refresh token stateful, single-use, and self-policing.</p>
+
+  <div class="card">
+    <h3>Two tiers, opposite trade-offs</h3>
+    <table>
+      <tr><th></th><th>Access token</th><th>Refresh token</th></tr>
+      <tr><td>Format</td><td>JWT (HS256), self-contained</td><td>Opaque random, server-stored</td></tr>
+      <tr><td>TTL</td><td>5 minutes</td><td>7 days</td></tr>
+      <tr><td>Revocable?</td><td><span class="pill bad">No — until exp</span></td><td><span class="pill ok">Yes — instantly</span></td></tr>
+      <tr><td>Rotates?</td><td>n/a</td><td><span class="pill ok">Every /refresh</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Play the lifecycle</h3>
+    <p class="muted">Pick a scenario, then step through it.</p>
+    <div class="switch" id="jwtMode">
+      <button class="sel" data-mode="legit">😇 Legitimate use</button>
+      <button data-mode="attack">😈 Stolen token replay</button>
+    </div>
+    <div class="stepbar" id="jwtSteps"></div>
+    <div class="stagebox" id="jwtStage"></div>
+  </div>
+
+  <div class="card">
+    <h3>The tripwire, in code</h3>
+    <pre><code>public RefreshToken rotate(String presented) {
+    RefreshToken existing = tokensById.get(presented);
+    if (existing == null)    throw new RefreshTokenException("Unknown refresh token");
+    if (existing.revoked())  throw new RefreshTokenException("Refresh token revoked");
+    if (existing.isExpired())throw new RefreshTokenException("Refresh token expired");
+
+    if (existing.used()) {                       // ← reuse = proof of theft
+        revokeFamily(existing.familyId());       //   burn the whole family
+        throw new RefreshTokenException("Refresh token reuse detected; family revoked");
+    }
+    existing.markUsed();                          // single-use
+    return mint(existing.userId(), existing.familyId());   // successor, same family
+}</code></pre>
+    <p class="muted">Legit clients always present the <em>newest</em> token. A thief who copied
+    an earlier one eventually presents an already-<code>used</code> token → the tripwire fires
+    and ejects <em>everyone</em> in the family, forcing a clean re-login.</p>
+  </div>
+</section>
+
+<!-- ============================ PKCE ============================ -->
+<section class="tab" id="pkce">
+  <h2>POC 2 — OAuth 2.1 Authorization Code + PKCE</h2>
+  <p class="lead">The hard problem: a public client (SPA / mobile) can't keep a secret, and the
+  authorization <em>code</em> travels through the interceptable browser. PKCE proves the
+  redeemer is the initiator — with no client secret.</p>
+
+  <div class="card">
+    <h3>The handshake</h3>
+    <svg viewBox="0 0 900 300" role="img" aria-label="PKCE flow">
+      <defs><marker id="ah2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#7c5cff"/></marker></defs>
+      <rect x="20" y="30" width="150" height="44" rx="9" fill="#33264d" stroke="#6d54b0"/>
+      <text x="95" y="57" fill="#e2d6ff" font-size="13" text-anchor="middle">Public Client</text>
+      <rect x="375" y="30" width="150" height="44" rx="9" fill="#20305a" stroke="#3a5da8"/>
+      <text x="450" y="57" fill="#cfe0ff" font-size="13" text-anchor="middle">Auth Server</text>
+      <rect x="730" y="30" width="150" height="44" rx="9" fill="#203a2f" stroke="#2f7d5e"/>
+      <text x="805" y="57" fill="#c9f5e0" font-size="13" text-anchor="middle">Resource Srv</text>
+
+      <line x1="95" y1="74" x2="95" y2="280" stroke="#2b3550"/>
+      <line x1="450" y1="74" x2="450" y2="280" stroke="#2b3550"/>
+      <line x1="805" y1="74" x2="805" y2="280" stroke="#2b3550"/>
+
+      <text x="100" y="100" fill="#9fb0cc" font-size="11">verifier=rand; challenge=SHA256(verifier)</text>
+      <line x1="95" y1="112" x2="448" y2="112" stroke="#7c5cff" stroke-width="2" marker-end="url(#ah2)"/>
+      <text x="270" y="108" fill="#cfe0ff" font-size="11" text-anchor="middle">/authorize?code_challenge&amp;state</text>
+
+      <text x="455" y="140" fill="#9fb0cc" font-size="11">login → store challenge vs single-use code</text>
+      <line x1="448" y1="152" x2="97" y2="152" stroke="#7c5cff" stroke-width="2" marker-end="url(#ah2)"/>
+      <text x="270" y="148" fill="#cfe0ff" font-size="11" text-anchor="middle">302 ?code&amp;state</text>
+
+      <text x="100" y="180" fill="#37d29a" font-size="11">check state matches</text>
+      <line x1="95" y1="192" x2="448" y2="192" stroke="#7c5cff" stroke-width="2" marker-end="url(#ah2)"/>
+      <text x="270" y="188" fill="#cfe0ff" font-size="11" text-anchor="middle">POST /token  code + verifier</text>
+
+      <text x="455" y="220" fill="#9fb0cc" font-size="11">SHA256(verifier) == stored challenge? (const-time)</text>
+      <line x1="448" y1="232" x2="97" y2="232" stroke="#7c5cff" stroke-width="2" marker-end="url(#ah2)"/>
+      <text x="270" y="228" fill="#cfe0ff" font-size="11" text-anchor="middle">access_token</text>
+
+      <line x1="95" y1="262" x2="803" y2="262" stroke="#37d29a" stroke-width="2" marker-end="url(#ah2)"/>
+      <text x="450" y="258" fill="#c9f5e0" font-size="11" text-anchor="middle">GET /api/me  Authorization: Bearer …</text>
+    </svg>
+    <p class="muted">Only the <strong>hash</strong> (challenge) crosses the interceptable
+    front-channel. The secret (<code>verifier</code>) is revealed only in the back-channel token
+    POST — and only after the code is spent. An intercepted code is useless without it.</p>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <h3>Try to break it → each attack has a named defence</h3>
+      <table>
+        <tr><th>Attack</th><th>Result</th></tr>
+        <tr><td>Redeem the code twice</td><td><span class="pill bad">code already used</span></td></tr>
+        <tr><td>Wrong <code>code_verifier</code></td><td><span class="pill bad">PKCE verification failed</span></td></tr>
+        <tr><td><code>code_challenge_method=plain</code></td><td><span class="pill bad">only S256 supported</span></td></tr>
+        <tr><td>Unregistered <code>redirect_uri</code></td><td><span class="pill bad">not registered</span></td></tr>
+        <tr><td>Tampered <code>state</code></td><td><span class="pill bad">CSRF/state mismatch</span></td></tr>
+        <tr><td>Other client redeems the code</td><td><span class="pill bad">client_id mismatch</span></td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Constant-time compare (the silent one)</h3>
+      <pre><code>public static boolean verify(String verifier,
+        String challenge, String method) {
+  if (!"S256".equals(method)) return false;   // no 'plain'
+  String computed = s256Challenge(verifier);
+  return MessageDigest.isEqual(               // ← constant time
+      computed.getBytes(US_ASCII),
+      challenge.getBytes(US_ASCII));
+}</code></pre>
+      <p class="muted"><code>String.equals</code> short-circuits on the first mismatched byte —
+      a timing side-channel that lets an attacker brute-force the challenge one byte at a time.
+      <code>MessageDigest.isEqual</code> takes the same time regardless.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ DEFENCES ============================ -->
+<section class="tab" id="defences">
+  <h2>The "silent" defences worth memorizing</h2>
+  <p class="lead">The specs hint at these but don't shout them — cheap to add, painful to omit.
+  Each maps to one place in the code.</p>
+
+  <div class="card">
+  <table>
+    <tr><th>#</th><th>Technique</th><th>Stops</th><th>Home</th></tr>
+    <tr><td>1</td><td><code>MessageDigest.isEqual</code></td><td>PKCE timing side-channel</td><td>PkceUtils.java:50</td></tr>
+    <tr><td>2</td><td>Single-use code + refresh reuse detection</td><td>Replay / token theft</td><td>AuthorizationCodeStore.java:41 · RefreshTokenService.java:72</td></tr>
+    <tr><td>3</td><td><code>requireIssuer</code> on JWT verify</td><td>Cross-tenant token confusion</td><td>JwtService.java:49</td></tr>
+    <tr><td>4</td><td><code>redirect_uri</code> exact-match (both endpoints)</td><td>Open-redirect → code leak</td><td>AuthorizationServerController.java:57,126</td></tr>
+    <tr><td>5</td><td>OAuth <code>state</code></td><td>CSRF / code injection</td><td>ClientDemoController.java:52,79</td></tr>
+    <tr><td>6</td><td><code>SecureRandom</code> · 256-bit · URL-safe base64</td><td>Guessable / unsafe-to-transport tokens</td><td>RefreshTokenService.java:108</td></tr>
+    <tr><td>7</td><td>BCrypt password hashing</td><td>Credential theft at rest</td><td>SecurityConfig.java:17</td></tr>
+    <tr><td>8</td><td>Permissive auth filter (authn ≠ authz)</td><td>Tangled auth logic</td><td>JwtAuthenticationFilter.java:53</td></tr>
+    <tr><td>9</td><td>Reject <code>plain</code> PKCE</td><td>Verifier leaking in the URL</td><td>PkceUtils.java:46</td></tr>
+    <tr><td>10</td><td>Validation at the boundary (<code>@Valid</code>)</td><td>Malformed input reaching logic</td><td>LoginRequest.java</td></tr>
+  </table>
+  </div>
+
+  <div class="card">
+    <h3>Tech debt — honest about the shortcuts</h3>
+    <ul class="tight muted">
+      <li>Tokens/codes are <strong>in-memory, raw</strong> — production stores a <em>hash</em> in Redis/Postgres.</li>
+      <li>Signing key sits in <code>application.yml</code> — inject via env / KMS / Vault.</li>
+      <li>HS256 single shared secret — prefer <strong>RS256/EdDSA + JWKS</strong> when verification is split across services.</li>
+      <li><code>rotate()</code> is check-then-act, not atomic — needs a DB transaction or Lua script under concurrency.</li>
+      <li>No consent UI, no OIDC <code>id_token</code>, no MFA — use Keycloak / Ory for a real IdP.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ SCALE ============================ -->
+<section class="tab" id="scale">
+  <h2>Scaling — what breaks when you add a second replica</h2>
+  <p class="lead">The access token scales for free (any replica verifies a JWT from the key).
+  The <strong>stateful</strong> parts — refresh rotation, reuse detection, single-use codes —
+  live in one JVM's heap and break the moment traffic spreads across pods / VMs.</p>
+
+  <div class="card">
+    <h3>The dangerous, silent break</h3>
+    <svg viewBox="0 0 900 260" role="img" aria-label="Cross-pod break">
+      <rect x="30" y="30" width="150" height="60" rx="10" fill="#1c2740" stroke="#2b3550"/>
+      <text x="105" y="65" fill="#e7ecf5" font-size="13" text-anchor="middle">Client</text>
+      <rect x="330" y="20" width="200" height="60" rx="10" fill="#20305a" stroke="#3a5da8"/>
+      <text x="430" y="45" fill="#cfe0ff" font-size="13" text-anchor="middle">Pod A</text>
+      <text x="430" y="65" fill="#9fb0cc" font-size="11" text-anchor="middle">heap: {R1 used=false}</text>
+      <rect x="330" y="150" width="200" height="60" rx="10" fill="#3a2530" stroke="#a8425d"/>
+      <text x="430" y="175" fill="#ffd6de" font-size="13" text-anchor="middle">Pod B</text>
+      <text x="430" y="195" fill="#9fb0cc" font-size="11" text-anchor="middle">heap: { } — never saw R1</text>
+
+      <line x1="180" y1="55" x2="328" y2="50" stroke="#37d29a" stroke-width="2"/>
+      <text x="250" y="42" fill="#37d29a" font-size="11" text-anchor="middle">login → R1</text>
+      <line x1="180" y1="70" x2="328" y2="180" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="250" y="150" fill="#ff6b6b" font-size="11" text-anchor="middle">refresh(R1) → 401 unknown</text>
+
+      <text x="640" y="70" fill="#ffb454" font-size="12">⚠ Availability: random logouts,</text>
+      <text x="640" y="90" fill="#ffb454" font-size="12">every deploy = everyone out.</text>
+      <text x="640" y="130" fill="#ff6b6b" font-size="12">☠ Security: a stolen R1 replayed</text>
+      <text x="640" y="150" fill="#ff6b6b" font-size="12">on Pod B is NOT flagged as reuse.</text>
+      <text x="640" y="170" fill="#ff6b6b" font-size="12">The guarantee is silently lost.</text>
+    </svg>
+  </div>
+
+  <div class="card">
+    <h3>The fix: stateless pods + shared store + atomic mutations</h3>
+    <table>
+      <tr><th>State</th><th>Move to</th><th>Make atomic with</th></tr>
+      <tr><td>Refresh tokens (hashed)</td><td>Postgres / Redis</td><td><code>UPDATE … WHERE used=false RETURNING</code> or Lua</td></tr>
+      <tr><td>Authorization codes</td><td>Redis (TTL 60s)</td><td><code>GETDEL</code> (delete-on-read)</td></tr>
+      <tr><td>Client PKCE / <code>state</code></td><td>Spring Session + Redis, or client-side</td><td>—</td></tr>
+      <tr><td>Access-token verify</td><td>nothing (stateless)</td><td>RS256/EdDSA + JWKS when shared</td></tr>
+    </table>
+    <p class="muted">The service APIs (<code>issueNewFamily</code>, <code>rotate</code>,
+    <code>revokeFamily</code>, <code>consume</code>) stay identical — only the backing store
+    changes. Pass the load test at <code>replicas ≥ 3</code> and you're done: the guarantee
+    must hold <strong>regardless of which replica</strong> serves each request. Full detail in
+    <code>CONSISTENCY.md</code>.</p>
+  </div>
+</section>
+
+<div class="foot">
+  Reference docs in this repo: <span class="kbd">ISSUE.md</span> ·
+  <span class="kbd">TECHNICAL.md</span> · <span class="kbd">CONSISTENCY.md</span> ·
+  <span class="kbd">WALKTHROUGH.md</span> · <span class="kbd">SYSTEM_DESIGN_NOTES.md</span> ·
+  <span class="kbd">SPRING_SECURITY_INTERNALS.md</span><br/>
+  Teaching artifact — read the tech-debt notes before borrowing anything for production.
+</div>
+</div>
+
+<script>
+// ---- Tab switching ----
+const tabs = document.getElementById('tabs');
+tabs.addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('section.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.getElementById(b.dataset.tab).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+// ---- JWT lifecycle player ----
+const scenarios = {
+  legit: [
+    {t:"1 · Login", h:"POST /api/auth/login",
+     d:"alice authenticates. Server issues an access JWT (5 min) and refresh token <b>R1</b> starting family <b>F</b>.",
+     c:"pill ok", tag:"issued"},
+    {t:"2 · Call API", h:"GET /api/me + Bearer access",
+     d:"The JwtAuthenticationFilter verifies the JWT (signature + issuer) and populates the security context. 200 OK.",
+     c:"pill ok", tag:"verified"},
+    {t:"3 · Rotate", h:"POST /api/auth/refresh (R1)",
+     d:"R1 is valid and unused → marked <b>used</b>, successor <b>R2</b> minted in the same family F. Client stores R2.",
+     c:"pill ok", tag:"R1→R2"},
+    {t:"4 · Rotate again", h:"POST /api/auth/refresh (R2)",
+     d:"Client always presents the newest token. R2 → R3, R3 → R4 … a smooth chain. No re-login needed for 7 days.",
+     c:"pill ok", tag:"chain ✓"},
+  ],
+  attack: [
+    {t:"1 · Login", h:"POST /api/auth/login",
+     d:"alice logs in. Refresh token <b>R1</b> issued (family F). An attacker manages to copy R1.",
+     c:"pill warn", tag:"R1 copied"},
+    {t:"2 · Legit rotate", h:"POST /api/auth/refresh (R1)",
+     d:"The real client rotates first: R1 marked <b>used</b>, <b>R2</b> issued. The attacker still holds the stale R1.",
+     c:"pill ok", tag:"R1 used"},
+    {t:"3 · Attacker replays", h:"POST /api/auth/refresh (R1)",
+     d:"R1 is already <b>used</b> → <b>REUSE DETECTED</b>. This is the tripwire: theft assumed.",
+     c:"pill bad", tag:"tripwire!"},
+    {t:"4 · Family burned", h:"revokeFamily(F)",
+     d:"The <b>entire family F</b> is revoked — R2 included. Both attacker and victim are ejected; the user must log in again. Blast radius contained.",
+     c:"pill bad", tag:"F revoked"},
+  ]
+};
+let jwtMode='legit', jwtStep=0;
+const jwtSteps=document.getElementById('jwtSteps');
+const jwtStage=document.getElementById('jwtStage');
+function renderJwt(){
+  const arr=scenarios[jwtMode];
+  jwtSteps.innerHTML='';
+  arr.forEach((s,i)=>{
+    const b=document.createElement('button');
+    b.textContent=s.t; b.className=i===jwtStep?'on':'';
+    b.onclick=()=>{jwtStep=i;renderJwt();};
+    jwtSteps.appendChild(b);
+  });
+  const s=arr[jwtStep];
+  jwtStage.innerHTML=`<h4>${s.h} <span class="${s.c}">${s.tag}</span></h4><p style="margin:.2em 0">${s.d}</p>`;
+}
+document.getElementById('jwtMode').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#jwtMode button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); jwtMode=b.dataset.mode; jwtStep=0; renderJwt();
+});
+renderJwt();
+</script>
+</body>
+</html>

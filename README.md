@@ -7,6 +7,21 @@ A single Spring Boot 3 app (Java 21) demonstrating two authentication-security p
 
 Everything is in-memory so the POC starts clean every run. Demo users:
 
+## Documentation map
+
+Start here depending on what you need:
+
+| Doc | What it answers |
+|-----|-----------------|
+| **[ISSUE.md](ISSUE.md)** | *Why this exists* — the precise problems and sub-problems each POC guards against. |
+| **[TECHNICAL.md](TECHNICAL.md)** | *How it's solved* — per POC: the hard problem, what we protect, solution shape, key tech **by responsibility**, how each sub-problem maps to code, and the tech debt to acknowledge. |
+| **[CONSISTENCY.md](CONSISTENCY.md)** | *Scaling* — exactly what breaks when you run >1 replica (k8s pods / VMs) and how to fix it with a shared store + atomic mutations. |
+| **[docs/explainer.html](docs/explainer.html)** | *Visual explainer* — open in a browser for interactive flow diagrams and an animated token-lifecycle demo. |
+| [WALKTHROUGH.md](WALKTHROUGH.md) | Runnable, step-by-step attack/defence demos. |
+| [SYSTEM_DESIGN_NOTES.md](SYSTEM_DESIGN_NOTES.md) | How real companies split auth into services. |
+| [SPRING_SECURITY_INTERNALS.md](SPRING_SECURITY_INTERNALS.md) | Spring Security filter-chain internals. |
+
+
 | Username | Password    | Roles       |
 |----------|-------------|-------------|
 | alice    | wonderland  | USER        |
